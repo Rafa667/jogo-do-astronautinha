@@ -153,22 +153,33 @@ class Player:
         self.speed = 180.0
         self.jump_strength = 550.0
         self.frames = []
+        self.reflection_frames = [] 
+        self.facing_right = True
+
         try:
             f0 = images.load("tile_0000")
             self.frames.append(getattr(f0, "surface", f0))
             f1 = images.load("tile_0001")
             self.frames.append(getattr(f1, "surface", f1))
+            
+            rf0 = images.load("tile_reflection_0000")
+            self.reflection_frames.append(getattr(rf0, "surface", rf0))
+            rf1 = images.load("tile_reflection_0001")
+            self.reflection_frames.append(getattr(rf1, "surface", rf1))
+            
         except Exception:
             self.frames = []
+            self.reflection_frames = []
 
     def update(self, dt, keys):
         if keys.left:
             self.vx = -self.speed
+            self.facing_right = False 
         elif keys.right:
             self.vx = self.speed
+            self.facing_right = True 
         else:
             self.vx = 0
-
         if (keys.w or keys.up) and self.on_ground:
             self.vy = -self.jump_strength
             self.on_ground = False
@@ -185,7 +196,7 @@ class Player:
         if self.rect.top > HEIGHT + 200:
             self.health = 0
 
-    def _collide_x(self):
+    def _collide_x(self, **kwargs):
         r = self.rect
         left_tile = int(r.left // TILE_SIZE)
         right_tile = int((r.right - 1) // TILE_SIZE)
@@ -200,8 +211,8 @@ class Player:
             if self.tile_map.is_solid(left_tile, top_tile) or self.tile_map.is_solid(left_tile, bottom_tile):
                 r.left = (left_tile + 1) * TILE_SIZE
                 self.vx = 0
-
-    def _collide_y(self):
+                
+    def _collide_y(self, **kwargs):
         r = self.rect
         left_tile = int(r.left // TILE_SIZE)
         right_tile = int((r.right - 1) // TILE_SIZE)
@@ -224,12 +235,16 @@ class Player:
             self.health = 0
 
     def draw(self):
-        if self.frames:
+        # Determina qual conjunto de frames usar
+        current_frames = self.reflection_frames if self.facing_right else self.frames
+        
+        if current_frames:
             if abs(self.vx) > 10:
-                idx = int(get_current_time_ms() / 150) % len(self.frames)
+                idx = int(get_current_time_ms() / 150) % len(current_frames)
             else:
                 idx = 0
-            surf = self.frames[idx]
+            
+            surf = current_frames[idx]
             try:
                 rect_img = getattr(surf, "get_rect", None)
                 if rect_img:
@@ -251,12 +266,21 @@ class Enemy:
         self.range_x = range_tiles * TILE_SIZE
         self.vx = float(speed)
         self.frames = []
+        self.reflection_frames = [] # Novo atributo para frames espelhados
+        
         try:
             a = images.load("tile_0022")
             b = images.load("tile_0023")
             self.frames = [getattr(a, "surface", a), getattr(b, "surface", b)]
+            
+            # Carrega frames espelhados
+            ra = images.load("tile_reflection_0022")
+            rb = images.load("tile_reflection_0023")
+            self.reflection_frames = [getattr(ra, "surface", ra), getattr(rb, "surface", rb)]
+            
         except Exception:
             self.frames = []
+            self.reflection_frames = []
 
     def update(self, dt):
         self.rect.x += int(self.vx * dt)
@@ -266,9 +290,13 @@ class Enemy:
             self.vx = abs(self.vx)
 
     def draw(self):
-        if self.frames:
-            idx = int(get_current_time_ms() / 160) % len(self.frames)
-            surf = self.frames[idx]
+        # O inimigo está olhando para a direita se self.vx > 0
+        facing_right = self.vx > 0
+        current_frames = self.reflection_frames if facing_right else self.frames
+        
+        if current_frames:
+            idx = int(get_current_time_ms() / 160) % len(current_frames)
+            surf = current_frames[idx]
             try:
                 img_rect = surf.get_rect(center=(self.rect.centerx, self.rect.centery))
                 screen.surface.blit(surf, img_rect)
